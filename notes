@@ -1,0 +1,31 @@
+project-root/
+├── docs/
+│   ├── CLAUDE.md
+│   ├── PROJECT_SPECS.md
+│   ├── TECH_STACK.md
+│   ├── AGENTS.md
+│   └── STAGES.md
+├── .gitignore
+└── README.md
+
+
+Copy the template for a new project
+
+bash
+git clone https://github.com/yourname/claude-webapp-template my-new-app
+cd my-new-app
+rm -rf .git && git init
+Fill in the placeholders – Open each file in docs/ and replace everything in brackets with your app’s details. You can ask Claude to help you generate the initial specs by giving a short description.
+
+Start a Claude Code session
+
+Open the project in VS Code.
+
+In Claude Code, say: “Read all the files in docs/ and acknowledge you understand the project.”
+
+Then: “We are ready to begin Phase 1. Create branch phase-1-foundation and implement the first task from STAGES.md.”
+
+Work phase by phase – After each commit, Claude updates STAGES.md. If your session ends, simply reload the docs and say “Continue from the last completed phase.”
+
+Adapt for a different stack – The template is deliberately generic. If you move away from Cloudflare, just update TECH_STACK.md and adjust the folder structure. The process of context files, phase tracking, and Git branches remains identical.
+
