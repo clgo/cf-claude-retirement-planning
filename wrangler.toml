@@ -12,3 +12,15 @@ pages_build_output_dir = "public"
 binding = "DB"
 database_name = "retirement_calculator"
 database_id = "PASTE_YOUR_DATABASE_ID_HERE"
+
+# --- Google sign-in ---------------------------------------------------------
+# Three values are required; none of them belong in this file.
+#
+#   GOOGLE_CLIENT_ID      public, but kept with the others for symmetry
+#   GOOGLE_CLIENT_SECRET  secret — never commit
+#   SESSION_SECRET        secret — random string used to sign session cookies
+#
+# Local dev: put them in .dev.vars (gitignored).
+# Production: Pages project -> Settings -> Variables and Secrets -> add as
+# secrets, then redeploy. Until all three exist the app still runs; the API
+# reports 503 and the UI shows "cloud storage not connected".

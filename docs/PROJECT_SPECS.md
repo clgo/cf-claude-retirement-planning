@@ -33,10 +33,20 @@ Target user: a numerate non-specialist planning their own retirement, who wants 
    against the exit and target ages, plus line charts for accumulation and drawdown.
 8. **Year-by-year tables** – Accumulation and drawdown tables showing age, invested
    principal, and balance per year for both scenarios.
-9. **Save scenario to cloud** *(optional)* – Persist the current input set under a name to
-   D1, list saved scenarios in a dropdown, reload one into the form, and delete one.
-   When D1 is unbound the dropdown reads "cloud storage not connected" and every other
-   feature continues to work.
+9. **Save scenario to cloud** *(optional, requires sign-in)* – Persist the current input
+   set under a name to D1, list your saved scenarios in a dropdown, reload one into the
+   form, and delete one. When D1 is unbound or auth is unconfigured the dropdown reads
+   "cloud storage not connected" and every other feature continues to work.
+10. **Sign in with Google** – A single "Sign in with Google" link starts a server-side
+   OAuth redirect; on return the header shows the signed-in email and a "Sign out" button.
+   Saved scenarios are private to the signed-in account. Signing in is **never** required
+   to use the calculator — only to save or reload. While signed out, the cloud controls
+   are disabled and the dropdown reads "sign in to see saved scenarios".
+11. **Privacy note** – Visible near the top of the page, stating in plain language that
+   the calculator runs locally and needs no account; that sign-in exists only for saving;
+   that saved scenarios are tied to the user's Google account and visible only to them;
+   exactly what is stored (Google account id, email, saved figures); and that any saved
+   scenario can be deleted at any time.
 
 ## Data Model (high-level)
 
@@ -51,19 +61,32 @@ Target user: a numerate non-specialist planning their own retirement, who wants 
 
 ### `scenarios` (D1 table)
 - `id` INTEGER PRIMARY KEY AUTOINCREMENT
+- `user_sub` TEXT NOT NULL — owner; the Google `sub` claim. Every query filters on this.
+- `user_email` TEXT NOT NULL DEFAULT `''` — display only, never used to authorise
 - `name` TEXT NOT NULL — user-supplied label, trimmed, max 120 chars
 - `data` TEXT NOT NULL — JSON string of the input state above, max 10 000 chars
 - `created_at` TEXT NOT NULL DEFAULT `datetime('now')`
-- Index `idx_scenarios_created` on `(created_at DESC)`
+- Index `idx_scenarios_user` on `(user_sub, created_at DESC)`
+
+### Session (no table — stateless cookie)
+- `sub`, `email`, `exp`, signed with HMAC-SHA256 over `SESSION_SECRET`
 
 ## Non-Functional Requirements
 - **Performance**: Single HTML document, no build step, no external requests on load.
   Recalculation and re-render on every input change must feel instant (projections are
   bounded by a human lifespan, so a few hundred rows at most).
-- **Security**: No authentication and no user accounts — the scenarios table is therefore
-  a shared, world-readable/writable store. Do **not** put anything personally identifying
-  in it. All SQL uses bound parameters. Input is length-capped server-side (120 char name,
-  10 KB payload) to bound abuse. Adding auth is a future phase, not an assumption.
+- **Security**: Google OAuth 2.0 sign-in, server-side authorization-code flow. Every
+  `/api/scenarios*` route requires a valid session and filters on `user_sub`, so one
+  account cannot read, modify, or delete another's rows. Sessions are HMAC-signed
+  `HttpOnly` cookies — tampering with the payload invalidates the signature. All SQL uses
+  bound parameters. Input is length-capped server-side (120 char name, 10 KB payload).
+  Names are rendered with `textContent`, never `innerHTML`, so a stored name cannot inject
+  script. Known gaps, accepted for now: no rate limiting on writes, and no server-side
+  session revocation (logout clears the cookie but a stolen cookie stays valid until it
+  expires).
+- **Privacy**: Stored per scenario — Google account id, email, scenario name, and the
+  entered figures. Not shared between accounts. Users can delete any scenario at any time.
+  The privacy note in the UI must stay accurate if this list ever changes.
 - **Deployment**: Cloudflare Pages, deployed from GitHub `main`. Build command empty,
   output directory `public`, Functions auto-discovered from `functions/`.
 - **Cost constraints**: Cloudflare free tier only — Pages static hosting, Pages Functions

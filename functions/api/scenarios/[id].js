@@ -1,31 +1,27 @@
 // Cloudflare Pages Function — /api/scenarios/:id
-// GET    -> fetch one scenario
-// DELETE -> remove one scenario
+// GET    -> fetch one of the signed-in user's scenarios
+// DELETE -> remove one of the signed-in user's scenarios
 //
-// Requires a D1 binding named "DB".
+// Both queries filter on user_sub as well as id, so a row belonging to another
+// account behaves exactly as if it did not exist. We deliberately answer 404
+// rather than 403 in that case: 403 would confirm that the id is real and
+// simply belongs to somebody else.
 
-const json = (body, status = 200) =>
-  new Response(JSON.stringify(body), {
-    status,
-    headers: { "Content-Type": "application/json", "Cache-Control": "no-store" },
-  });
+import { getSession, json, noDB, unauthorized } from "../_shared.js";
 
-function noDB() {
-  return json(
-    { error: "D1 database binding 'DB' is not configured for this Pages project." },
-    503
-  );
-}
-
-export async function onRequestGet({ params, env }) {
+export async function onRequestGet({ params, request, env }) {
   if (!env.DB) return noDB();
+  const session = await getSession(request, env);
+  if (!session) return unauthorized();
+
   const id = Number(params.id);
   if (!Number.isInteger(id)) return json({ error: "Invalid id." }, 400);
+
   try {
     const row = await env.DB.prepare(
-      "SELECT id, name, data, created_at FROM scenarios WHERE id = ?"
+      "SELECT id, name, data, created_at FROM scenarios WHERE id = ? AND user_sub = ?"
     )
-      .bind(id)
+      .bind(id, session.sub)
       .first();
     if (!row) return json({ error: "Not found." }, 404);
     return json(row);
@@ -34,12 +30,23 @@ export async function onRequestGet({ params, env }) {
   }
 }
 
-export async function onRequestDelete({ params, env }) {
+export async function onRequestDelete({ params, request, env }) {
   if (!env.DB) return noDB();
+  const session = await getSession(request, env);
+  if (!session) return unauthorized();
+
   const id = Number(params.id);
   if (!Number.isInteger(id)) return json({ error: "Invalid id." }, 400);
+
   try {
-    await env.DB.prepare("DELETE FROM scenarios WHERE id = ?").bind(id).run();
+    const res = await env.DB.prepare(
+      "DELETE FROM scenarios WHERE id = ? AND user_sub = ?"
+    )
+      .bind(id, session.sub)
+      .run();
+    // Report what actually happened; the old version claimed success for ids
+    // that were never there.
+    if (!res.meta.changes) return json({ error: "Not found." }, 404);
     return json({ deleted: id });
   } catch (e) {
     return json({ error: String(e) }, 500);

@@ -39,37 +39,83 @@ the layout Cloudflare Pages requires, get it under version control, and confirm 
 | `POST` malformed JSON | 400 |
 | `DELETE /api/scenarios/:id` | 200 `{deleted}` |
 
-## Phase 2 – D1 wiring ❌
+## Phase 2 – Google sign-in & per-user scoping 🚧
+Brought forward ahead of deploy: the API was unauthenticated and the `scenarios` table was
+a single shared bucket, so deploying first would have exposed an open read/write endpoint.
+
+- [x] Server-side OAuth (`functions/api/auth/{login,callback,me,logout}.js`) — chosen over
+      Google Identity Services so no third-party script loads in the browser
+- [x] HMAC-SHA256 signed `HttpOnly` session cookie; `state` cookie for CSRF
+- [x] `functions/api/_shared.js` for the helpers both route files were duplicating
+- [x] `user_sub` / `user_email` on `scenarios`; every query filtered by owner
+- [x] `DELETE` now 404s instead of reporting success for rows that were never there
+- [x] Sign-in/out UI and the plain-language privacy note
+- [x] Verified locally against a minted session (see table below)
+- [ ] **Manual:** create the Google OAuth client and fill in `.dev.vars` (README §3)
+- [ ] End-to-end sign-in with a real Google account — cannot be tested without the above
+- **Last commit:** `pending`
+- **Branch:** `phase-2-google-auth`
+- **Next task:** follow README §3 to create the OAuth client, then sign in for real
+
+### Local verification (Phase 2, run 2026-08-09, dummy credentials + minted cookie)
+| Check | Result |
+|---|---|
+| `GET /api/auth/me` signed out | 200 `{signedIn:false}` |
+| list / create / delete, signed out | 401 ×3 |
+| `GET /api/auth/login` | 302 to Google, `state` cookie set |
+| create as user A, as user B | 201, 201 |
+| A lists / B lists | each sees only their own row |
+| B reads A's id | 404 |
+| B deletes A's id | 404, A's row intact |
+| forged signature | 401 |
+| **valid cookie, `sub` swapped to A** | **401** |
+| expired cookie, valid signature | 401 |
+| garbage cookie | 401 |
+| A deletes own row / repeats | 200, then 404 |
+| callback without `state` cookie | 302 `/?auth=state` |
+| callback with `error=access_denied` | 302 `/?auth=denied` |
+| `POST /api/auth/logout` | 200, `Max-Age=0` |
+| `/api/_shared.js` | not routed; no source exposed |
+| calculator signed out | renders, 34 element ids resolve, JS parses |
+
+## Phase 3 – D1 wiring ❌
 - [ ] `npx wrangler login` and `npx wrangler d1 create retirement_calculator` *(manual)*
 - [ ] Paste the printed `database_id` into `wrangler.toml`
 - [ ] `npm run db:init:remote` to create the table
 - [x] `npm run db:init` for the local dev database
-- [x] Verify save → list → load → delete round-trips locally (done in Phase 1 above)
+- [x] Verify save → list → load → delete round-trips locally
 - **Last commit:** `pending`
-- **Branch:** `phase-2-d1-wiring`
+- **Branch:** `phase-3-d1-wiring`
 - **Next task:** create the remote database and fill in `database_id`. Note that
   `db:init` currently writes to a local database keyed on the literal placeholder
   `PASTE_YOUR_DATABASE_ID_HERE`; once a real `database_id` is pasted in, the local
   database is re-keyed and the table must be created again with `npm run db:init`.
 
-## Phase 3 – Deploy ❌
+## Phase 4 – Deploy ❌
 - [ ] Push to GitHub
 - [ ] Connect the repo in Cloudflare Pages (preset None, empty build command, output `public`)
 - [ ] Confirm the `DB` binding is picked up from `wrangler.toml` on deploy
-- [ ] Smoke-test all four API routes against the deployed URL
+- [ ] Add `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `SESSION_SECRET` as Pages **secrets**
+- [ ] Add the `https://<project>.pages.dev` origin and callback URL to the Google client
+- [ ] Smoke-test every route against the deployed URL
 - **Last commit:** `pending`
-- **Branch:** `phase-3-deploy`
-- **Next task:** blocked on Phase 2
+- **Branch:** `phase-4-deploy`
+- **Next task:** blocked on Phase 3
 
-## Phase 4 – Hardening ❌
+## Phase 5 – Hardening ❌
 - [ ] Verify the financial model against a reference spreadsheet (see `model-verifier`
       in `AGENTS.md`) — accumulation, drawdown, required capital, required injection
 - [ ] Accessibility pass on the SVG charts and the year-by-year tables
-- [ ] Decide whether the unauthenticated shared `scenarios` table is acceptable, or
-      whether auth becomes a spec requirement
+- [ ] Rate-limit `POST /api/scenarios` — an authenticated account can still create
+      unlimited rows and burn the D1 free-tier quota
+- [ ] Decide whether session revocation is needed (a stolen cookie stays valid for 30 days;
+      fixing it means a sessions table or a per-user token version)
+- [ ] Consider a `functions/api/[[path]].js` catch-all so unmatched `/api/*` returns JSON
+      404 instead of falling through to `index.html` with a 200
+- [ ] Upgrade wrangler 3 → 4 (clears 6 dev-only advisories in `esbuild`/`undici`/`ws`/`sharp`)
 - **Last commit:** `pending`
-- **Branch:** `phase-4-hardening`
-- **Next task:** blocked on Phase 3
+- **Branch:** `phase-5-hardening`
+- **Next task:** blocked on Phase 4
 
 **Resume instructions**: Read the first incomplete phase, check out its branch (or create
 it), and start from the `Next task` line. After each commit update this file.

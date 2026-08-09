@@ -31,8 +31,20 @@ frontend degrades to local-only operation. This is the expected state before D1 
 - Runtime: **Cloudflare Workers** via Pages Functions.
 - Framework: none. Each file exports `onRequestGet` / `onRequestPost` / `onRequestDelete`
   and receives the `{ request, env, params }` context directly.
-- Authentication: **none currently.** Endpoints are public. See the security note in
-  `PROJECT_SPECS.md` before storing anything sensitive.
+- Authentication: **Google OAuth 2.0, server-side authorization-code flow.**
+  `/api/auth/login` → Google → `/api/auth/callback` exchanges the code for an `id_token`
+  using `GOOGLE_CLIENT_SECRET`, reads the `sub` and `email` claims, and sets a session
+  cookie. No third-party script loads in the browser.
+- Session: stateless HMAC-SHA256 token in an `HttpOnly`, `SameSite=Lax` cookie
+  (`rr_session`), `Secure` whenever the request is https. Payload is `{sub, email, exp}` —
+  signed, not encrypted, so nothing secret goes in it. 30-day expiry. No sessions table,
+  so there is no server-side revocation; logout clears the cookie.
+- CSRF: the OAuth `state` parameter is a `crypto.randomUUID()` stored in a short-lived
+  `rr_oauth_state` cookie and compared on callback. Logout is POST-only so it cannot be
+  triggered by a cross-site `<img>` or link.
+- Config: `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `SESSION_SECRET`. Local values live
+  in `.dev.vars` (gitignored); production values are Pages Secrets. When any are absent the
+  auth endpoints return `503` and the app degrades to calculator-only.
 
 ## Database
 - Provider: **Cloudflare D1** (SQLite), bound as `env.DB` via `wrangler.toml`.

@@ -87,6 +87,22 @@
   .cloud-note { font-size: 11.5px; color: var(--muted); font-family: var(--mono); }
   .cloud-note b { color: var(--ink-soft); font-weight: 600; }
 
+  /* ---------- Auth ---------- */
+  .auth-box { display: inline-flex; align-items: center; gap: 8px; margin-left: auto; }
+  a.signin {
+    font-family: var(--sans); font-size: 13px; font-weight: 560;
+    padding: 8px 13px; border-radius: 8px; text-decoration: none;
+    border: 1px solid var(--line); background: var(--surface); color: var(--ink-soft);
+  }
+  a.signin:hover { background: var(--surface-2); }
+  #signedInAs { display: inline-flex; align-items: center; gap: 8px;
+    font-size: 12px; color: var(--muted); font-family: var(--mono); }
+  #signedInAs b { color: var(--ink-soft); font-weight: 600; }
+  .privacy-note {
+    margin: 10px 0 0; max-width: 78ch;
+    font-size: 11.5px; line-height: 1.55; color: var(--muted);
+  }
+
   /* ---------- Layout ---------- */
   .grid { display: grid; grid-template-columns: 340px 1fr; gap: 26px; align-items: start; }
   @media (max-width: 900px) { .grid { grid-template-columns: 1fr; } }
@@ -253,7 +269,18 @@
       <button class="danger" id="deleteBtn" type="button">Delete</button>
       <input type="text" id="scenarioName" placeholder="Name this scenario" aria-label="Scenario name" />
       <button id="saveBtn" type="button">Save to cloud</button>
+      <span class="auth-box">
+        <a class="signin" id="signInBtn" href="/api/auth/login" hidden>Sign in with Google</a>
+        <span id="signedInAs" hidden><b id="userEmail"></b><button class="ghost" id="signOutBtn" type="button">Sign out</button></span>
+      </span>
     </div>
+    <p class="privacy-note" id="privacyNote">
+      The calculator runs entirely in your browser and needs no account. Sign in
+      with Google only if you want to save scenarios — saved scenarios are tied to
+      your Google account and visible only to you. We store your Google account id,
+      your email address, and the figures you choose to save. Nothing is shared with
+      anyone else, and you can delete any saved scenario at any time.
+    </p>
   </header>
 
   <div class="grid">
@@ -467,7 +494,7 @@
 
       <footer class="foot">
         <p><b>Assumptions.</b> Growth compounds annually. Scenario B injections are added at each year-end. In drawdown, each year's inflated expense is withdrawn, then the remaining balance grows at the post-exit rate; balance is floored at zero once depleted. Figures are nominal SGD and ignore tax, CPF, and market volatility. This is a planning aid, not financial advice.</p>
-        <p>Runs entirely in your browser. <b>Save to cloud</b> uses a Cloudflare Pages Function backed by D1 at <code>/api/scenarios</code>; the calculator itself works with no backend.</p>
+        <p>Runs entirely in your browser. <b>Save to cloud</b> uses a Cloudflare Pages Function backed by D1 at <code>/api/scenarios</code>, and requires signing in with Google so your scenarios stay private to your account; the calculator itself works with no backend and no account.</p>
       </footer>
 
     </main>
@@ -845,10 +872,71 @@ function applyState(state) {
   render();
 }
 
+/* ---------- auth ---------- */
+// The calculator never depends on any of this: signed out, unconfigured, or
+// offline, everything above still computes. Only the cloud controls change.
+
+let auth = { signedIn: false, configured: false, email: null };
+
+function placeholderOption(text) {
+  const sel = $("scenarioSelect");
+  sel.length = 1;
+  const opt = document.createElement("option");
+  opt.textContent = text;
+  opt.disabled = true;
+  sel.appendChild(opt);
+}
+
+function renderAuth() {
+  $("signInBtn").hidden = !auth.configured || auth.signedIn;
+  $("signedInAs").hidden = !auth.signedIn;
+  $("userEmail").textContent = auth.email || "";
+
+  // Cloud controls are meaningless until there is somewhere to put the data.
+  const usable = auth.configured && auth.signedIn;
+  ["saveBtn", "loadBtn", "deleteBtn", "scenarioSelect", "scenarioName"].forEach(
+    (id) => { $(id).disabled = !usable; }
+  );
+}
+
+async function refreshAuth() {
+  try {
+    const res = await fetch("/api/auth/me");
+    if (!res.ok) throw new Error("me " + res.status);
+    auth = await res.json();
+  } catch (e) {
+    auth = { signedIn: false, configured: false, email: null };
+  }
+  renderAuth();
+}
+
+async function signOut() {
+  try { await fetch("/api/auth/logout", { method: "POST" }); }
+  catch (e) { /* clearing the cookie is best-effort */ }
+  await refreshAuth();
+  placeholderOption("(sign in to see saved scenarios)");
+  toast("Signed out.");
+}
+
+/* Surface why a sign-in attempt bounced, then tidy the URL. */
+function reportAuthRedirect() {
+  const reason = new URLSearchParams(location.search).get("auth");
+  if (!reason) return;
+  const messages = {
+    denied: "Sign-in cancelled.",
+    state: "Sign-in expired or was interrupted — please try again.",
+    exchange: "Google sign-in failed. Please try again.",
+    unverified: "That Google account has no verified email address.",
+  };
+  toast(messages[reason] || "Sign-in failed.", true);
+  history.replaceState(null, "", location.pathname);
+}
+
 async function refreshScenarios() {
   const sel = $("scenarioSelect");
   try {
     const res = await fetch(API);
+    if (res.status === 401) { placeholderOption("(sign in to see saved scenarios)"); return; }
     if (!res.ok) throw new Error("api " + res.status);
     const list = await res.json();
     sel.length = 1;
@@ -859,13 +947,10 @@ async function refreshScenarios() {
       opt.dataset.state = s.data;
       sel.appendChild(opt);
     });
+    if (!list.length) placeholderOption("(no saved scenarios yet)");
   } catch (e) {
     // backend not deployed yet — disable cloud buttons quietly
-    sel.length = 1;
-    const opt = document.createElement("option");
-    opt.textContent = "(cloud storage not connected)";
-    opt.disabled = true;
-    sel.appendChild(opt);
+    placeholderOption("(cloud storage not connected)");
   }
 }
 
@@ -878,10 +963,11 @@ async function saveScenario() {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ name, data: JSON.stringify(currentState()) }),
     });
+    if (res.status === 401) { await refreshAuth(); toast("Sign in with Google to save.", true); return; }
     if (!res.ok) throw new Error("save " + res.status);
     $("scenarioName").value = "";
     await refreshScenarios();
-    toast("Saved “" + name + "” to cloud.");
+    toast("Saved “" + name + "” to your account.");
   } catch (e) {
     toast("Couldn't save — is D1 bound to this Pages project?", true);
   }
@@ -901,6 +987,7 @@ async function deleteScenario() {
   if (!id) { toast("Pick a saved scenario first.", true); return; }
   try {
     const res = await fetch(API + "/" + id, { method: "DELETE" });
+    if (res.status === 401) { await refreshAuth(); toast("Sign in with Google to delete.", true); return; }
     if (!res.ok) throw new Error("del " + res.status);
     await refreshScenarios();
     toast("Deleted.");
@@ -912,9 +999,14 @@ FIELDS.forEach((f) => $(f).addEventListener("input", render));
 $("saveBtn").addEventListener("click", saveScenario);
 $("loadBtn").addEventListener("click", loadScenario);
 $("deleteBtn").addEventListener("click", deleteScenario);
+$("signOutBtn").addEventListener("click", signOut);
 
 render();
-refreshScenarios();
+reportAuthRedirect();
+refreshAuth().then(() => {
+  if (auth.signedIn) refreshScenarios();
+  else placeholderOption(auth.configured ? "(sign in to see saved scenarios)" : "(cloud storage not connected)");
+});
 </script>
 </body>
 </html>

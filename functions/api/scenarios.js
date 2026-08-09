@@ -1,28 +1,24 @@
 // Cloudflare Pages Function — /api/scenarios
-// GET  -> list saved scenarios (newest first)
-// POST -> create a scenario { name, data }
+// GET  -> list the signed-in user's scenarios (newest first)
+// POST -> create a scenario { name, data } owned by the signed-in user
 //
-// Requires a D1 binding named "DB" (see wrangler.toml / README).
+// Requires a D1 binding named "DB" (see wrangler.toml / README) and a valid
+// session cookie. Both routes are scoped to the caller — there is no way to
+// reach another account's rows through this endpoint.
 
-const json = (body, status = 200) =>
-  new Response(JSON.stringify(body), {
-    status,
-    headers: { "Content-Type": "application/json", "Cache-Control": "no-store" },
-  });
+import { getSession, json, noDB, unauthorized } from "./_shared.js";
 
-function noDB() {
-  return json(
-    { error: "D1 database binding 'DB' is not configured for this Pages project." },
-    503
-  );
-}
-
-export async function onRequestGet({ env }) {
+export async function onRequestGet({ request, env }) {
   if (!env.DB) return noDB();
+  const session = await getSession(request, env);
+  if (!session) return unauthorized();
+
   try {
     const { results } = await env.DB.prepare(
-      "SELECT id, name, data, created_at FROM scenarios ORDER BY created_at DESC, id DESC"
-    ).all();
+      "SELECT id, name, data, created_at FROM scenarios WHERE user_sub = ? ORDER BY created_at DESC, id DESC"
+    )
+      .bind(session.sub)
+      .all();
     return json(results || []);
   } catch (e) {
     return json({ error: String(e) }, 500);
@@ -31,6 +27,9 @@ export async function onRequestGet({ env }) {
 
 export async function onRequestPost({ request, env }) {
   if (!env.DB) return noDB();
+  const session = await getSession(request, env);
+  if (!session) return unauthorized();
+
   let body;
   try {
     body = await request.json();
@@ -46,9 +45,9 @@ export async function onRequestPost({ request, env }) {
 
   try {
     const res = await env.DB.prepare(
-      "INSERT INTO scenarios (name, data) VALUES (?, ?)"
+      "INSERT INTO scenarios (user_sub, user_email, name, data) VALUES (?, ?, ?, ?)"
     )
-      .bind(name, data)
+      .bind(session.sub, session.email || "", name, data)
       .run();
     return json({ id: res.meta.last_row_id, name }, 201);
   } catch (e) {
