@@ -11,7 +11,7 @@ pages_build_output_dir = "public"
 [[d1_databases]]
 binding = "DB"
 database_name = "retirement_calculator"
-database_id = "PASTE_YOUR_DATABASE_ID_HERE"
+database_id = "e4f2eb61-01f8-4b1d-b3e2-63e58548bf59"
 
 # --- Google sign-in ---------------------------------------------------------
 # Three values are required; none of them belong in this file.
