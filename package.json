@@ -1,0 +1,15 @@
+{
+  "name": "sg-retirement-calculator",
+  "version": "1.0.0",
+  "description": "SGD investment accumulation + retirement drawdown planner on Cloudflare Pages",
+  "private": true,
+  "scripts": {
+    "dev": "wrangler pages dev public --d1 DB=retirement_calculator",
+    "db:init": "wrangler d1 execute retirement_calculator --local --file=./schema.sql",
+    "db:init:remote": "wrangler d1 execute retirement_calculator --remote --file=./schema.sql",
+    "deploy": "wrangler pages deploy public"
+  },
+  "devDependencies": {
+    "wrangler": "^3.90.0"
+  }
+}

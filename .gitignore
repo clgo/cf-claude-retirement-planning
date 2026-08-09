@@ -18,7 +18,9 @@ out/
 
 # Cloudflare / Wrangler
 .wrangler/
-wrangler.toml
+# wrangler.toml IS committed on purpose: Pages reads the D1 binding from it at
+# deploy time (see README "Bind D1 to the Pages project"). database_id is not a
+# secret; real secrets belong in .dev.vars / dashboard environment variables.
 
 # OS
 .DS_Store

@@ -1,0 +1,920 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Retirement Runway — SGD Investment & Drawdown Planner</title>
+<style>
+  :root {
+    --ink: #16232b;
+    --ink-soft: #33454e;
+    --muted: #5f727b;
+    --line: #d7dee2;
+    --line-soft: #e7ecef;
+    --canvas: #e9edf0;
+    --surface: #ffffff;
+    --surface-2: #f4f7f8;
+    --teal: #0f6e6c;
+    --teal-deep: #0a4f4e;
+    --teal-tint: #e2efef;
+    --pass: #157f5b;
+    --pass-tint: #e3f1ea;
+    --fail: #b23a32;
+    --fail-tint: #f6e4e2;
+    --amber: #b6832a;
+    --input-focus: #0f6e6c;
+    --sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    --mono: ui-monospace, "SF Mono", "SFMono-Regular", "Cascadia Code", "Roboto Mono", Consolas, "Liberation Mono", monospace;
+    --radius: 10px;
+    --shadow: 0 1px 2px rgba(22,35,43,.06), 0 6px 20px rgba(22,35,43,.05);
+  }
+
+  * { box-sizing: border-box; }
+  html { -webkit-text-size-adjust: 100%; }
+  body {
+    margin: 0;
+    font-family: var(--sans);
+    color: var(--ink);
+    background:
+      radial-gradient(1200px 600px at 100% -10%, #eef3f4 0%, transparent 60%),
+      var(--canvas);
+    line-height: 1.5;
+    font-size: 15px;
+  }
+
+  a { color: var(--teal); }
+
+  .wrap { max-width: 1240px; margin: 0 auto; padding: 24px 20px 80px; }
+
+  /* ---------- Masthead ---------- */
+  header.masthead {
+    display: flex; flex-wrap: wrap; gap: 16px;
+    align-items: flex-end; justify-content: space-between;
+    padding: 8px 0 22px; border-bottom: 1px solid var(--line);
+    margin-bottom: 26px;
+  }
+  .brand h1 {
+    font-size: clamp(22px, 3vw, 30px);
+    letter-spacing: -0.02em; margin: 0; font-weight: 680;
+  }
+  .brand .kicker {
+    font-family: var(--mono);
+    font-size: 11px; letter-spacing: 0.18em; text-transform: uppercase;
+    color: var(--teal); margin: 0 0 4px;
+  }
+  .brand p.sub { margin: 6px 0 0; color: var(--muted); font-size: 13.5px; max-width: 52ch; }
+
+  .scenario-bar { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+  .scenario-bar select, .scenario-bar input[type=text] {
+    font-family: var(--sans); font-size: 13px; padding: 8px 10px;
+    border: 1px solid var(--line); border-radius: 8px; background: var(--surface); color: var(--ink);
+  }
+  .scenario-bar input[type=text] { width: 150px; }
+  button {
+    font-family: var(--sans); font-size: 13px; font-weight: 560;
+    padding: 8px 13px; border-radius: 8px; cursor: pointer;
+    border: 1px solid var(--teal); background: var(--teal); color: #fff;
+    transition: filter .12s ease, transform .04s ease;
+  }
+  button:hover { filter: brightness(1.06); }
+  button:active { transform: translateY(1px); }
+  button.ghost { background: var(--surface); color: var(--teal); }
+  button.ghost:hover { background: var(--teal-tint); }
+  button.danger { background: var(--surface); color: var(--fail); border-color: var(--fail); }
+  button.danger:hover { background: var(--fail-tint); }
+  button:disabled { opacity: .45; cursor: not-allowed; }
+
+  .cloud-note { font-size: 11.5px; color: var(--muted); font-family: var(--mono); }
+  .cloud-note b { color: var(--ink-soft); font-weight: 600; }
+
+  /* ---------- Layout ---------- */
+  .grid { display: grid; grid-template-columns: 340px 1fr; gap: 26px; align-items: start; }
+  @media (max-width: 900px) { .grid { grid-template-columns: 1fr; } }
+
+  .panel {
+    background: var(--surface); border: 1px solid var(--line-soft);
+    border-radius: var(--radius); box-shadow: var(--shadow);
+  }
+  aside.inputs { position: sticky; top: 18px; }
+  @media (max-width: 900px) { aside.inputs { position: static; } }
+
+  .card { padding: 18px 18px 20px; }
+  .card + .card { border-top: 1px solid var(--line-soft); }
+  .card h2 {
+    font-size: 12px; letter-spacing: 0.14em; text-transform: uppercase;
+    color: var(--teal-deep); margin: 0 0 14px; font-weight: 700;
+    display: flex; align-items: baseline; gap: 8px;
+  }
+  .card h2 .idx { font-family: var(--mono); color: var(--teal); font-weight: 700; }
+
+  .field { margin-bottom: 12px; }
+  .field:last-child { margin-bottom: 0; }
+  .field label {
+    display: block; font-size: 12.5px; color: var(--ink-soft);
+    margin-bottom: 4px; font-weight: 520;
+  }
+  .field .hint { color: var(--muted); font-weight: 400; font-size: 11.5px; }
+  .input-wrap { position: relative; display: flex; align-items: center; }
+  .input-wrap .affix {
+    position: absolute; font-family: var(--mono); font-size: 12px; color: var(--muted);
+    pointer-events: none;
+  }
+  .input-wrap .affix.pre { left: 11px; }
+  .input-wrap .affix.suf { right: 11px; }
+  input[type=number] {
+    width: 100%; font-family: var(--mono); font-size: 14px; color: var(--ink);
+    padding: 9px 11px; border: 1px solid var(--line); border-radius: 8px;
+    background: var(--surface); transition: border-color .12s, box-shadow .12s;
+  }
+  input.has-pre { padding-left: 26px; }
+  input.has-suf { padding-right: 30px; }
+  input[type=number]:focus {
+    outline: none; border-color: var(--input-focus);
+    box-shadow: 0 0 0 3px rgba(15,110,108,.14);
+  }
+  input.derived { background: var(--surface-2); color: var(--ink-soft); border-style: dashed; }
+
+  .ref {
+    font-size: 11px; color: var(--muted); margin-top: 6px; line-height: 1.45;
+    border-left: 2px solid var(--teal-tint); padding-left: 8px;
+  }
+
+  /* ---------- Signature: Longevity Runway ---------- */
+  .runway-panel { padding: 20px 22px 22px; margin-bottom: 22px; }
+  .runway-head { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 10px; margin-bottom: 4px; }
+  .runway-head .verdict {
+    font-size: clamp(18px, 2.4vw, 24px); font-weight: 700; letter-spacing: -0.01em;
+  }
+  .verdict.pass { color: var(--pass); }
+  .verdict.fail { color: var(--fail); }
+  .runway-head .scope { font-family: var(--mono); font-size: 12px; color: var(--muted); }
+  .runway-sub { color: var(--muted); font-size: 13px; margin: 0 0 14px; }
+  .runway-svg { width: 100%; height: 118px; display: block; }
+  .runway-legend { display: flex; flex-wrap: wrap; gap: 16px 22px; margin-top: 10px; font-size: 12px; color: var(--ink-soft); }
+  .runway-legend .dot { display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 6px; vertical-align: middle; }
+
+  /* ---------- Metric cards ---------- */
+  .metrics { display: grid; grid-template-columns: repeat(2, 1fr); gap: 14px; margin-bottom: 22px; }
+  @media (max-width: 560px) { .metrics { grid-template-columns: 1fr; } }
+  .metric { padding: 15px 16px; }
+  .metric .m-label { font-size: 11.5px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); margin-bottom: 8px; }
+  .metric .m-cols { display: flex; gap: 18px; }
+  .metric .m-col { flex: 1; }
+  .metric .m-tag { font-size: 11px; color: var(--muted); margin-bottom: 2px; }
+  .metric .m-val { font-family: var(--mono); font-size: 18px; font-weight: 600; letter-spacing: -0.01em; }
+  .metric .m-val.a { color: var(--ink); }
+  .metric .m-val.b { color: var(--teal); }
+  .metric.single .m-val { font-size: 22px; }
+
+  /* ---------- Section blocks in main ---------- */
+  .block { margin-bottom: 22px; }
+  .block > .card > h2 .idx { color: var(--teal); }
+
+  .backcalc-out { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 4px; }
+  @media (max-width: 560px) { .backcalc-out { grid-template-columns: 1fr; } }
+  .result-tile {
+    background: var(--surface-2); border: 1px solid var(--line-soft); border-radius: 8px;
+    padding: 12px 13px;
+  }
+  .result-tile.key { background: var(--teal-tint); border-color: #bfdedd; }
+  .result-tile .rt-label { font-size: 12px; color: var(--ink-soft); margin-bottom: 5px; }
+  .result-tile .rt-val { font-family: var(--mono); font-size: 17px; font-weight: 650; color: var(--teal-deep); }
+
+  .verdict-lines { margin-top: 12px; display: grid; gap: 8px; }
+  .vline { display: flex; align-items: center; gap: 10px; padding: 10px 12px; border-radius: 8px; font-size: 13.5px; }
+  .vline.pass { background: var(--pass-tint); color: #0d5c41; }
+  .vline.fail { background: var(--fail-tint); color: #8f2a24; }
+  .vline .badge { font-family: var(--mono); font-weight: 700; font-size: 11px; padding: 2px 7px; border-radius: 5px; }
+  .vline.pass .badge { background: var(--pass); color: #fff; }
+  .vline.fail .badge { background: var(--fail); color: #fff; }
+  .vline .txt b { font-family: var(--mono); }
+
+  /* ---------- Charts ---------- */
+  .charts { display: grid; grid-template-columns: 1fr 1fr; gap: 22px; margin-bottom: 22px; }
+  @media (max-width: 780px) { .charts { grid-template-columns: 1fr; } }
+  .chart-card h3 { font-size: 13px; margin: 0 0 2px; font-weight: 640; }
+  .chart-card .chart-sub { font-size: 12px; color: var(--muted); margin: 0 0 10px; }
+  .chart-svg { width: 100%; height: 210px; display: block; }
+  .chart-legend { display: flex; gap: 16px; font-size: 12px; color: var(--ink-soft); margin-top: 6px; }
+  .chart-legend .swatch { display: inline-block; width: 14px; height: 3px; border-radius: 2px; margin-right: 6px; vertical-align: middle; }
+
+  /* ---------- Tables ---------- */
+  details.tablewrap { margin-bottom: 16px; }
+  details.tablewrap > summary {
+    cursor: pointer; list-style: none; padding: 13px 16px; font-weight: 600; font-size: 13.5px;
+    display: flex; align-items: center; justify-content: space-between;
+  }
+  details.tablewrap > summary::-webkit-details-marker { display: none; }
+  details.tablewrap > summary .chev { transition: transform .15s; color: var(--muted); font-family: var(--mono); }
+  details.tablewrap[open] > summary .chev { transform: rotate(90deg); }
+  .table-scroll { overflow-x: auto; border-top: 1px solid var(--line-soft); }
+  table { border-collapse: collapse; width: 100%; font-family: var(--mono); font-size: 12.5px; }
+  thead th {
+    position: sticky; top: 0; background: var(--surface-2); text-align: right;
+    font-weight: 600; color: var(--ink-soft); padding: 9px 12px; border-bottom: 1px solid var(--line);
+    font-family: var(--sans); font-size: 11.5px; white-space: nowrap;
+  }
+  thead th:first-child, tbody td:first-child { text-align: left; }
+  tbody td { padding: 7px 12px; text-align: right; border-bottom: 1px solid var(--line-soft); white-space: nowrap; }
+  tbody tr:hover td { background: var(--surface-2); }
+  tbody tr.exit-row td { background: var(--teal-tint); font-weight: 600; }
+  tbody tr.depleted td { color: var(--fail); }
+  td.neg { color: var(--fail); }
+
+  footer.foot { margin-top: 34px; padding-top: 18px; border-top: 1px solid var(--line); color: var(--muted); font-size: 12px; line-height: 1.6; }
+  footer.foot code { font-family: var(--mono); background: var(--surface-2); padding: 1px 5px; border-radius: 4px; }
+
+  .toast {
+    position: fixed; bottom: 22px; left: 50%; transform: translateX(-50%) translateY(20px);
+    background: var(--ink); color: #fff; padding: 11px 18px; border-radius: 8px; font-size: 13.5px;
+    box-shadow: 0 8px 30px rgba(0,0,0,.25); opacity: 0; pointer-events: none;
+    transition: opacity .2s, transform .2s; z-index: 50;
+  }
+  .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+  .toast.err { background: var(--fail); }
+
+  @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header class="masthead">
+    <div class="brand">
+      <p class="kicker">SGD · Accumulate → Drawdown</p>
+      <h1>Retirement Runway</h1>
+      <p class="sub">Enter your numbers once. See whether your invested capital carries you from your exit age all the way to your target age — with and without annual top-ups.</p>
+    </div>
+    <div class="scenario-bar">
+      <select id="scenarioSelect" title="Saved scenarios" aria-label="Saved scenarios">
+        <option value="">— Saved scenarios —</option>
+      </select>
+      <button class="ghost" id="loadBtn" type="button">Load</button>
+      <button class="danger" id="deleteBtn" type="button">Delete</button>
+      <input type="text" id="scenarioName" placeholder="Name this scenario" aria-label="Scenario name" />
+      <button id="saveBtn" type="button">Save to cloud</button>
+    </div>
+  </header>
+
+  <div class="grid">
+
+    <!-- ================= INPUTS ================= -->
+    <aside class="inputs">
+      <div class="panel">
+        <div class="card">
+          <h2><span class="idx">01</span> Accumulation</h2>
+          <div class="field">
+            <label for="entryAge">Entry age <span class="hint">— when you start investing</span></label>
+            <div class="input-wrap"><input type="number" id="entryAge" value="30" min="0" max="99" step="1" /></div>
+          </div>
+          <div class="field">
+            <label for="exitAge">Exit age <span class="hint">— drawdown begins</span></label>
+            <div class="input-wrap"><input type="number" id="exitAge" value="65" min="1" max="110" step="1" /></div>
+          </div>
+          <div class="field">
+            <label for="years">Investment period <span class="hint">— exit − entry</span></label>
+            <div class="input-wrap"><input type="number" id="years" class="derived" readonly tabindex="-1" /><span class="affix suf">yrs</span></div>
+          </div>
+          <div class="field">
+            <label for="currentValue">Current market value</label>
+            <div class="input-wrap"><span class="affix pre">$</span><input type="number" id="currentValue" class="has-pre" value="100000" min="0" step="1000" /></div>
+          </div>
+          <div class="field">
+            <label for="growthRate">Target annual growth</label>
+            <div class="input-wrap"><input type="number" id="growthRate" class="has-suf" value="6" step="0.1" /><span class="affix suf">%</span></div>
+          </div>
+          <div class="field">
+            <label for="injection">Annual capital injection <span class="hint">— Scenario B</span></label>
+            <div class="input-wrap"><span class="affix pre">$</span><input type="number" id="injection" class="has-pre" value="6000" min="0" step="500" /></div>
+          </div>
+        </div>
+
+        <div class="card">
+          <h2><span class="idx">02</span> Expense &amp; inflation</h2>
+          <div class="field">
+            <label for="monthlyExpense">Current monthly expense</label>
+            <div class="input-wrap"><span class="affix pre">$</span><input type="number" id="monthlyExpense" class="has-pre" value="4000" min="0" step="100" /></div>
+          </div>
+          <div class="field">
+            <label for="annualExpense">Current annual expense <span class="hint">— × 12</span></label>
+            <div class="input-wrap"><span class="affix pre">$</span><input type="number" id="annualExpense" class="has-pre derived" readonly tabindex="-1" /></div>
+          </div>
+          <div class="field">
+            <label for="inflation">Annual inflation</label>
+            <div class="input-wrap"><input type="number" id="inflation" class="has-suf" value="3.3" step="0.1" /><span class="affix suf">%</span></div>
+            <div class="ref">Singapore CPI averaged ≈ 3.3% p.a. over 2021–2025 (2021: 2.3, 2022: 6.1, 2023: 4.8, 2024: 2.4, 2025: 0.9). Source: SingStat / Macrotrends. Edit to your own view.</div>
+          </div>
+          <div class="field">
+            <label for="postGrowth">Post-exit growth <span class="hint">— return during drawdown</span></label>
+            <div class="input-wrap"><input type="number" id="postGrowth" class="has-suf" value="6" step="0.1" /><span class="affix suf">%</span></div>
+          </div>
+        </div>
+
+        <div class="card">
+          <h2><span class="idx">03</span> Targets</h2>
+          <div class="field">
+            <label for="targetExit">Target exit value <span class="hint">— for §5 back-calc</span></label>
+            <div class="input-wrap"><span class="affix pre">$</span><input type="number" id="targetExit" class="has-pre" value="500000" min="0" step="10000" /></div>
+          </div>
+          <div class="field">
+            <label for="deathAge">Target age / life expectancy</label>
+            <div class="input-wrap"><input type="number" id="deathAge" class="has-suf" value="100" min="1" max="120" step="1" /><span class="affix suf">yrs</span></div>
+          </div>
+        </div>
+      </div>
+    </aside>
+
+    <!-- ================= RESULTS ================= -->
+    <main>
+
+      <!-- Signature: longevity runway -->
+      <section class="panel runway-panel">
+        <div class="runway-head">
+          <span class="verdict" id="verdictHeadline">—</span>
+          <span class="scope" id="verdictScope"></span>
+        </div>
+        <p class="runway-sub" id="verdictSub"></p>
+        <svg class="runway-svg" id="runwaySvg" viewBox="0 0 900 118" preserveAspectRatio="none" role="img" aria-label="Capital longevity runway"></svg>
+        <div class="runway-legend">
+          <span><span class="dot" style="background:var(--ink)"></span>No injection (A)</span>
+          <span><span class="dot" style="background:var(--teal)"></span>With injection (B)</span>
+          <span><span class="dot" style="background:var(--amber)"></span>Target age</span>
+        </div>
+      </section>
+
+      <!-- Key metrics -->
+      <section class="metrics">
+        <div class="panel metric">
+          <div class="m-label">Projected value at exit age</div>
+          <div class="m-cols">
+            <div class="m-col"><div class="m-tag">A · No injection</div><div class="m-val a" id="exitValA">—</div></div>
+            <div class="m-col"><div class="m-tag">B · With injection</div><div class="m-val b" id="exitValB">—</div></div>
+          </div>
+        </div>
+        <div class="panel metric">
+          <div class="m-label">Total invested (principal) by exit</div>
+          <div class="m-cols">
+            <div class="m-col"><div class="m-tag">A · No injection</div><div class="m-val a" id="prinA">—</div></div>
+            <div class="m-col"><div class="m-tag">B · With injection</div><div class="m-val b" id="prinB">—</div></div>
+          </div>
+        </div>
+        <div class="panel metric">
+          <div class="m-label">Expected expense at exit age (inflated)</div>
+          <div class="m-cols">
+            <div class="m-col"><div class="m-tag">Monthly</div><div class="m-val a" id="expMonthly">—</div></div>
+            <div class="m-col"><div class="m-tag">Annual</div><div class="m-val a" id="expAnnual">—</div></div>
+          </div>
+        </div>
+        <div class="panel metric">
+          <div class="m-label">Capital runs out at age</div>
+          <div class="m-cols">
+            <div class="m-col"><div class="m-tag">A · No injection</div><div class="m-val a" id="outAgeA">—</div></div>
+            <div class="m-col"><div class="m-tag">B · With injection</div><div class="m-val b" id="outAgeB">—</div></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Charts -->
+      <section class="charts">
+        <div class="panel card chart-card">
+          <h3>Accumulation — value to exit age</h3>
+          <p class="chart-sub">How the portfolio grows while you invest.</p>
+          <svg class="chart-svg" id="accChart" viewBox="0 0 460 210" preserveAspectRatio="none"></svg>
+          <div class="chart-legend">
+            <span><span class="swatch" style="background:var(--ink)"></span>No injection</span>
+            <span><span class="swatch" style="background:var(--teal)"></span>With injection</span>
+          </div>
+        </div>
+        <div class="panel card chart-card">
+          <h3>Drawdown — balance after exit age</h3>
+          <p class="chart-sub">Balance after each year's inflated withdrawal.</p>
+          <svg class="chart-svg" id="drawChart" viewBox="0 0 460 210" preserveAspectRatio="none"></svg>
+          <div class="chart-legend">
+            <span><span class="swatch" style="background:var(--ink)"></span>No injection</span>
+            <span><span class="swatch" style="background:var(--teal)"></span>With injection</span>
+          </div>
+        </div>
+      </section>
+
+      <!-- §5 back-calc: injection for target exit value -->
+      <section class="block panel">
+        <div class="card">
+          <h2><span class="idx">05</span> Injection needed for a target exit value</h2>
+          <div class="backcalc-out">
+            <div class="result-tile key">
+              <div class="rt-label">Required annual injection to reach your target exit value</div>
+              <div class="rt-val" id="reqInjection">—</div>
+            </div>
+            <div class="result-tile">
+              <div class="rt-label">Uses target exit, current value, growth &amp; years from the inputs</div>
+              <div class="rt-val" id="reqInjectionCtx" style="font-size:13px;color:var(--ink-soft)">—</div>
+            </div>
+          </div>
+          <p class="ref" style="margin-top:12px">PMT = (Target − PV·(1+r)ⁿ) · r / ((1+r)ⁿ − 1). Ordinary annuity — injection at each year-end.</p>
+        </div>
+      </section>
+
+      <!-- §8 back-calc: injection for target death age -->
+      <section class="block panel">
+        <div class="card">
+          <h2><span class="idx">08</span> Injection needed to last until your target age</h2>
+          <div class="backcalc-out">
+            <div class="result-tile">
+              <div class="rt-label">Years needed in retirement</div>
+              <div class="rt-val" id="yearsRetire">—</div>
+            </div>
+            <div class="result-tile">
+              <div class="rt-label">Capital required at exit age</div>
+              <div class="rt-val" id="reqCapital">—</div>
+            </div>
+            <div class="result-tile key" style="grid-column:1 / -1">
+              <div class="rt-label">Required annual injection during accumulation to reach that capital</div>
+              <div class="rt-val" id="reqInjectionDeath">—</div>
+            </div>
+          </div>
+          <div class="verdict-lines" id="verdictLines"></div>
+          <p class="ref" style="margin-top:12px">Required capital = E₁ · (1 − ((1+g)/(1+r))ⁿ) / (1 − (1+g)/(1+r)) — growing-annuity PV, where E₁ = first-year retirement expense, g = inflation, r = post-exit growth, n = years in retirement.</p>
+        </div>
+      </section>
+
+      <!-- Tables -->
+      <details class="tablewrap panel">
+        <summary><span>§4 · Year-by-year accumulation</span><span class="chev">▸</span></summary>
+        <div class="table-scroll">
+          <table id="accTable">
+            <thead><tr>
+              <th>Year</th><th>Age</th>
+              <th>A: value (no inj.)</th><th>A: invested</th>
+              <th>B: value (with inj.)</th><th>B: invested</th>
+            </tr></thead>
+            <tbody></tbody>
+          </table>
+        </div>
+      </details>
+
+      <details class="tablewrap panel">
+        <summary><span>§6 · Retirement drawdown</span><span class="chev">▸</span></summary>
+        <div class="table-scroll">
+          <table id="drawTable">
+            <thead><tr>
+              <th>Yr</th><th>Age</th><th>Expense (inflated)</th>
+              <th>A: balance (no inj.)</th><th>B: balance (with inj.)</th>
+            </tr></thead>
+            <tbody></tbody>
+          </table>
+        </div>
+      </details>
+
+      <footer class="foot">
+        <p><b>Assumptions.</b> Growth compounds annually. Scenario B injections are added at each year-end. In drawdown, each year's inflated expense is withdrawn, then the remaining balance grows at the post-exit rate; balance is floored at zero once depleted. Figures are nominal SGD and ignore tax, CPF, and market volatility. This is a planning aid, not financial advice.</p>
+        <p>Runs entirely in your browser. <b>Save to cloud</b> uses a Cloudflare Pages Function backed by D1 at <code>/api/scenarios</code>; the calculator itself works with no backend.</p>
+      </footer>
+
+    </main>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+"use strict";
+
+/* ============================================================
+   Retirement Runway — calculation + render engine
+   Mirrors the source spreadsheet's 8 sections, all client-side.
+   ============================================================ */
+
+const $ = (id) => document.getElementById(id);
+const FIELDS = ["entryAge","exitAge","currentValue","growthRate","injection",
+                "monthlyExpense","inflation","postGrowth","targetExit","deathAge"];
+
+const fmtMoney = (n) => {
+  if (!isFinite(n)) return "—";
+  const neg = n < 0;
+  const s = "$" + Math.round(Math.abs(n)).toLocaleString("en-SG");
+  return neg ? "(" + s + ")" : s;
+};
+const fmtPct = (f) => (f * 100).toFixed(1) + "%";
+
+function readInputs() {
+  const g = (id) => parseFloat($(id).value);
+  return {
+    entryAge: g("entryAge"),
+    exitAge: g("exitAge"),
+    pv: g("currentValue"),
+    r: g("growthRate") / 100,
+    pmt: g("injection"),
+    monthly: g("monthlyExpense"),
+    infl: g("inflation") / 100,
+    rr: g("postGrowth") / 100,
+    targetExit: g("targetExit"),
+    deathAge: g("deathAge"),
+  };
+}
+
+/* Future value of an ordinary annuity of `pmt` over n periods at rate r. */
+function annuityFV(pmt, r, n) {
+  if (n <= 0) return 0;
+  if (r === 0) return pmt * n;
+  return pmt * ((Math.pow(1 + r, n) - 1) / r);
+}
+
+/* Payment needed so PV grows to targetFV over n periods at r (year-end contributions). */
+function requiredPmt(targetFV, pv, r, n) {
+  if (n <= 0) return NaN;
+  const grownPV = pv * Math.pow(1 + r, n);
+  if (r === 0) return (targetFV - pv) / n;
+  return (targetFV - grownPV) * r / (Math.pow(1 + r, n) - 1);
+}
+
+/* PV of a growing annuity: payments E1, E1(1+g), ... for n periods discounted at r. */
+function growingAnnuityPV(E1, g, r, n) {
+  if (n <= 0) return 0;
+  if (Math.abs(r - g) < 1e-12) return E1 * n;
+  const ratio = (1 + g) / (1 + r);
+  return E1 * (1 - Math.pow(ratio, n)) / (1 - ratio);
+}
+
+function compute(inp) {
+  const years = Math.max(0, Math.round(inp.exitAge - inp.entryAge));
+  const annualExpense = inp.monthly * 12;
+
+  /* ---- §4 accumulation table ---- */
+  const acc = [];
+  for (let t = 0; t <= years; t++) {
+    const valA = inp.pv * Math.pow(1 + inp.r, t);
+    const valB = inp.pv * Math.pow(1 + inp.r, t) + annuityFV(inp.pmt, inp.r, t);
+    acc.push({
+      t, age: inp.entryAge + t,
+      valA, invA: inp.pv,
+      valB, invB: inp.pv + inp.pmt * t,
+    });
+  }
+  const exit = acc[acc.length - 1] || { valA: inp.pv, valB: inp.pv, invA: inp.pv, invB: inp.pv };
+
+  /* ---- §2 expense at exit ---- */
+  const monthlyAtExit = inp.monthly * Math.pow(1 + inp.infl, years);
+  const annualAtExit = annualExpense * Math.pow(1 + inp.infl, years); // E1
+
+  /* ---- §6 drawdown table ---- */
+  const horizon = Math.min(90, Math.max(60, Math.round(inp.deathAge - inp.exitAge) + 2));
+  const draw = [];
+  let balA = exit.valA, balB = exit.valB;
+  for (let k = 0; k <= horizon; k++) {
+    const expense = annualAtExit * Math.pow(1 + inp.infl, k);
+    if (k === 0) {
+      balA = exit.valA - expense;
+      balB = exit.valB - expense;
+    } else {
+      balA = balA <= 0 ? 0 : balA * (1 + inp.rr) - expense;
+      balB = balB <= 0 ? 0 : balB * (1 + inp.rr) - expense;
+    }
+    draw.push({ k, age: inp.exitAge + k, expense, balA, balB });
+  }
+
+  /* ---- §7 longevity: first year balance <= 0 ---- */
+  const depletion = (key) => {
+    for (let i = 0; i < draw.length; i++) if (draw[i][key] <= 0) return i;
+    return null; // survives the whole horizon
+  };
+  const yearsA = depletion("balA");
+  const yearsB = depletion("balB");
+
+  /* ---- §5 injection for target exit value ---- */
+  const reqInjection = requiredPmt(inp.targetExit, inp.pv, inp.r, years);
+
+  /* ---- §8 injection for target death age ---- */
+  const yearsRetire = Math.max(0, Math.round(inp.deathAge - inp.exitAge));
+  const reqCapital = growingAnnuityPV(annualAtExit, inp.infl, inp.rr, yearsRetire);
+  const reqInjectionDeath = requiredPmt(reqCapital, inp.pv, inp.r, years);
+
+  return {
+    inp, years, annualExpense, acc, exit,
+    monthlyAtExit, annualAtExit, draw, horizon,
+    yearsA, yearsB, reqInjection, yearsRetire, reqCapital, reqInjectionDeath,
+  };
+}
+
+/* ---------- rendering ---------- */
+
+function outcomeText(yearsOut, exitAge, deathAge) {
+  if (yearsOut === null) return { lasts: true, age: null, label: "lasts beyond the projection" };
+  const age = exitAge + yearsOut;
+  return { lasts: age >= deathAge, age, label: "runs out at age " + age };
+}
+
+function render() {
+  const inp = readInputs();
+  // guard: bad inputs
+  if (FIELDS.some((f) => isNaN(parseFloat($(f).value)))) return;
+
+  $("years").value = Math.max(0, Math.round(inp.exitAge - inp.entryAge));
+  $("annualExpense").value = Math.round(inp.monthly * 12);
+
+  const m = compute(inp);
+
+  // metrics
+  $("exitValA").textContent = fmtMoney(m.exit.valA);
+  $("exitValB").textContent = fmtMoney(m.exit.valB);
+  $("prinA").textContent = fmtMoney(inp.pv);
+  $("prinB").textContent = fmtMoney(inp.pv + inp.pmt * m.years);
+  $("expMonthly").textContent = fmtMoney(m.monthlyAtExit);
+  $("expAnnual").textContent = fmtMoney(m.annualAtExit);
+
+  const outA = outcomeText(m.yearsA, inp.exitAge, inp.deathAge);
+  const outB = outcomeText(m.yearsB, inp.exitAge, inp.deathAge);
+  $("outAgeA").textContent = outA.age === null ? "beyond " + (inp.exitAge + m.horizon) : outA.age;
+  $("outAgeB").textContent = outB.age === null ? "beyond " + (inp.exitAge + m.horizon) : outB.age;
+
+  // §5
+  $("reqInjection").textContent = isNaN(m.reqInjection) ? "—" : fmtMoney(m.reqInjection);
+  $("reqInjectionCtx").textContent =
+    "Target " + fmtMoney(inp.targetExit) + " · " + fmtPct(inp.r) + " · " + m.years + " yrs";
+
+  // §8
+  $("yearsRetire").textContent = m.yearsRetire + " yrs";
+  $("reqCapital").textContent = fmtMoney(m.reqCapital);
+  $("reqInjectionDeath").textContent = isNaN(m.reqInjectionDeath) ? "—" : fmtMoney(m.reqInjectionDeath);
+
+  renderVerdict(m, inp, outA, outB);
+  renderVerdictLines(inp, outA, outB);
+  renderRunway(m, inp, outA, outB);
+  renderAccTable(m);
+  renderDrawTable(m);
+  renderAccChart(m);
+  renderDrawChart(m);
+}
+
+function renderVerdict(m, inp, outA, outB) {
+  const head = $("verdictHeadline");
+  const sub = $("verdictSub");
+  const scope = $("verdictScope");
+  scope.textContent = "exit " + inp.exitAge + " → target " + inp.deathAge;
+
+  if (outB.lasts && outA.lasts) {
+    head.textContent = "You're covered to age " + inp.deathAge;
+    head.className = "verdict pass";
+    sub.textContent = "Both scenarios carry you to your target age. Even without annual injections the capital holds.";
+  } else if (outB.lasts) {
+    head.textContent = "Covered — but only with injections";
+    head.className = "verdict pass";
+    sub.textContent = "With your " + fmtMoney(inp.pmt || 0) + "/yr injection you reach age " +
+      inp.deathAge + ". Without it, capital " + outA.label + ".";
+  } else {
+    head.textContent = "Short of age " + inp.deathAge;
+    head.className = "verdict fail";
+    sub.textContent = "Even with injections, capital " + outB.label + ". See §8 for the injection needed to close the gap.";
+  }
+}
+
+function renderVerdictLines(inp, outA, outB) {
+  const wrap = $("verdictLines");
+  wrap.innerHTML = "";
+  const line = (out, label) => {
+    const div = document.createElement("div");
+    div.className = "vline " + (out.lasts ? "pass" : "fail");
+    const verdict = out.lasts
+      ? "Lasts to age " + inp.deathAge
+      : "Runs out at age " + out.age;
+    div.innerHTML = '<span class="badge">' + (out.lasts ? "YES" : "NO") + '</span>' +
+      '<span class="txt">' + label + ' — <b>' + verdict + '</b></span>';
+    wrap.appendChild(div);
+  };
+  line(outA, "Column A · no annual injection");
+  line(outB, "Column B · with current injection (" + fmtMoney(inp.pmt) + "/yr)");
+}
+
+/* ----- signature runway SVG ----- */
+function renderRunway(m, inp, outA, outB) {
+  const svg = $("runwaySvg");
+  const W = 900, H = 118, padL = 8, padR = 8;
+  const axisY = 78;
+  const startAge = inp.exitAge;
+  const endAge = Math.max(inp.deathAge, inp.exitAge + (m.horizon)) ;
+  const span = Math.max(1, endAge - startAge);
+  const x = (age) => padL + ((age - startAge) / span) * (W - padL - padR);
+
+  const parts = [];
+  // base track
+  parts.push(`<rect x="${padL}" y="${axisY-3}" width="${W-padL-padR}" height="6" rx="3" fill="#eef2f3"/>`);
+
+  // filled runway bars for A (top) and B (bottom)
+  const barFor = (out, yy, color) => {
+    const endX = out.age === null ? x(endAge) : x(Math.min(out.age, endAge));
+    return `<rect x="${padL}" y="${yy}" width="${Math.max(0,endX-padL)}" height="7" rx="3.5" fill="${color}"/>`;
+  };
+  parts.push(barFor(outA, axisY-22, "#16232b"));
+  parts.push(barFor(outB, axisY+9, "#0f6e6c"));
+
+  // target age marker (amber)
+  const tx = x(inp.deathAge);
+  parts.push(`<line x1="${tx}" y1="${axisY-30}" x2="${tx}" y2="${axisY+24}" stroke="#b6832a" stroke-width="2" stroke-dasharray="4 3"/>`);
+  parts.push(`<text x="${tx}" y="${axisY-34}" text-anchor="middle" font-family="ui-monospace,monospace" font-size="12" fill="#b6832a">age ${inp.deathAge}</text>`);
+
+  // runout markers
+  const mark = (out, color, yy) => {
+    if (out.age === null || out.age >= endAge) return "";
+    const mx = x(out.age);
+    return `<circle cx="${mx}" cy="${yy}" r="4.5" fill="#fff" stroke="${color}" stroke-width="2"/>`;
+  };
+  parts.push(mark(outA, "#16232b", axisY-18.5));
+  parts.push(mark(outB, "#0f6e6c", axisY+12.5));
+
+  // start/exit label + a few age ticks
+  parts.push(`<text x="${padL}" y="${axisY+40}" font-family="ui-monospace,monospace" font-size="12" fill="#5f727b">exit ${startAge}</text>`);
+  const tickCount = 5;
+  for (let i = 1; i <= tickCount; i++) {
+    const age = Math.round(startAge + (span * i) / (tickCount + 1));
+    const xx = x(age);
+    parts.push(`<text x="${xx}" y="${axisY+40}" text-anchor="middle" font-family="ui-monospace,monospace" font-size="11" fill="#9aa8ae">${age}</text>`);
+  }
+  parts.push(`<text x="${W-padR}" y="${axisY+40}" text-anchor="end" font-family="ui-monospace,monospace" font-size="12" fill="#5f727b">${endAge}</text>`);
+
+  svg.innerHTML = parts.join("");
+}
+
+/* ----- line charts ----- */
+function lineChart(svgEl, series, opts) {
+  const W = 460, H = 210, pad = { l: 8, r: 10, t: 12, b: 22 };
+  const n = series[0].pts.length;
+  const maxY = Math.max(1, ...series.flatMap((s) => s.pts.map((p) => p.y)));
+  const x = (i) => pad.l + (i / Math.max(1, n - 1)) * (W - pad.l - pad.r);
+  const y = (v) => H - pad.b - (Math.max(0, v) / maxY) * (H - pad.t - pad.b);
+  const parts = [];
+
+  // gridlines (4)
+  for (let g = 0; g <= 4; g++) {
+    const gy = pad.t + (g / 4) * (H - pad.t - pad.b);
+    const val = maxY * (1 - g / 4);
+    parts.push(`<line x1="${pad.l}" y1="${gy}" x2="${W-pad.r}" y2="${gy}" stroke="#eef2f3" stroke-width="1"/>`);
+    parts.push(`<text x="${pad.l}" y="${gy-3}" font-family="ui-monospace,monospace" font-size="9" fill="#aab6bb">${shortMoney(val)}</text>`);
+  }
+  // x labels (start / mid / end age)
+  if (opts && opts.ages) {
+    const idxs = [0, Math.floor((n-1)/2), n-1];
+    idxs.forEach((i) => {
+      parts.push(`<text x="${x(i)}" y="${H-6}" text-anchor="middle" font-family="ui-monospace,monospace" font-size="9.5" fill="#8a99a0">${opts.ages[i]}</text>`);
+    });
+  }
+  // area + line per series
+  series.forEach((s) => {
+    const path = s.pts.map((p, i) => (i ? "L" : "M") + x(i).toFixed(1) + " " + y(p.y).toFixed(1)).join(" ");
+    if (s.fill) {
+      const area = path + ` L${x(n-1).toFixed(1)} ${y(0)} L${x(0).toFixed(1)} ${y(0)} Z`;
+      parts.push(`<path d="${area}" fill="${s.fill}" opacity="0.10"/>`);
+    }
+    parts.push(`<path d="${path}" fill="none" stroke="${s.color}" stroke-width="2" stroke-linejoin="round"/>`);
+  });
+  svgEl.innerHTML = parts.join("");
+}
+
+function shortMoney(v) {
+  if (v >= 1e6) return "$" + (v / 1e6).toFixed(1) + "M";
+  if (v >= 1e3) return "$" + Math.round(v / 1e3) + "k";
+  return "$" + Math.round(v);
+}
+
+function renderAccChart(m) {
+  const ages = m.acc.map((r) => r.age);
+  lineChart($("accChart"), [
+    { pts: m.acc.map((r) => ({ y: r.valA })), color: "#16232b", fill: "#16232b" },
+    { pts: m.acc.map((r) => ({ y: r.valB })), color: "#0f6e6c", fill: "#0f6e6c" },
+  ], { ages });
+}
+
+function renderDrawChart(m) {
+  const ages = m.draw.map((r) => r.age);
+  lineChart($("drawChart"), [
+    { pts: m.draw.map((r) => ({ y: Math.max(0, r.balA) })), color: "#16232b", fill: "#16232b" },
+    { pts: m.draw.map((r) => ({ y: Math.max(0, r.balB) })), color: "#0f6e6c", fill: "#0f6e6c" },
+  ], { ages });
+}
+
+/* ----- tables ----- */
+function renderAccTable(m) {
+  const tb = $("accTable").querySelector("tbody");
+  tb.innerHTML = m.acc.map((r) => {
+    const isExit = r.t === m.years;
+    return `<tr class="${isExit ? "exit-row" : ""}">
+      <td>${r.t}</td><td>${r.age}</td>
+      <td>${fmtMoney(r.valA)}</td><td>${fmtMoney(r.invA)}</td>
+      <td>${fmtMoney(r.valB)}</td><td>${fmtMoney(r.invB)}</td></tr>`;
+  }).join("");
+}
+
+function renderDrawTable(m) {
+  const tb = $("drawTable").querySelector("tbody");
+  // show until both depleted (+2) or full horizon, capped for readability
+  let lastRow = m.draw.length - 1;
+  const depIdx = Math.max(
+    m.yearsA === null ? m.draw.length : m.yearsA,
+    m.yearsB === null ? m.draw.length : m.yearsB
+  );
+  lastRow = Math.min(m.draw.length - 1, Math.max(depIdx + 2, m.yearsRetire + 1));
+  const rows = m.draw.slice(0, lastRow + 1);
+  tb.innerHTML = rows.map((r) => {
+    const dep = r.balA <= 0 && r.balB <= 0;
+    return `<tr class="${dep ? "depleted" : ""}">
+      <td>${r.k}</td><td>${r.age}</td><td>${fmtMoney(r.expense)}</td>
+      <td class="${r.balA <= 0 ? "neg" : ""}">${r.balA <= 0 ? "$0" : fmtMoney(r.balA)}</td>
+      <td class="${r.balB <= 0 ? "neg" : ""}">${r.balB <= 0 ? "$0" : fmtMoney(r.balB)}</td></tr>`;
+  }).join("");
+}
+
+/* ============================================================
+   Cloud scenarios — Cloudflare Pages Function + D1
+   Gracefully no-ops if the API isn't deployed.
+   ============================================================ */
+const API = "/api/scenarios";
+
+function toast(msg, isErr) {
+  const t = $("toast");
+  t.textContent = msg;
+  t.className = "toast show" + (isErr ? " err" : "");
+  clearTimeout(t._timer);
+  t._timer = setTimeout(() => (t.className = "toast"), 2600);
+}
+
+function currentState() {
+  const o = {};
+  FIELDS.forEach((f) => (o[f] = $(f).value));
+  return o;
+}
+function applyState(state) {
+  FIELDS.forEach((f) => { if (state[f] !== undefined) $(f).value = state[f]; });
+  render();
+}
+
+async function refreshScenarios() {
+  const sel = $("scenarioSelect");
+  try {
+    const res = await fetch(API);
+    if (!res.ok) throw new Error("api " + res.status);
+    const list = await res.json();
+    sel.length = 1;
+    list.forEach((s) => {
+      const opt = document.createElement("option");
+      opt.value = s.id;
+      opt.textContent = s.name;
+      opt.dataset.state = s.data;
+      sel.appendChild(opt);
+    });
+  } catch (e) {
+    // backend not deployed yet — disable cloud buttons quietly
+    sel.length = 1;
+    const opt = document.createElement("option");
+    opt.textContent = "(cloud storage not connected)";
+    opt.disabled = true;
+    sel.appendChild(opt);
+  }
+}
+
+async function saveScenario() {
+  const name = $("scenarioName").value.trim();
+  if (!name) { toast("Name the scenario first.", true); return; }
+  try {
+    const res = await fetch(API, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name, data: JSON.stringify(currentState()) }),
+    });
+    if (!res.ok) throw new Error("save " + res.status);
+    $("scenarioName").value = "";
+    await refreshScenarios();
+    toast("Saved “" + name + "” to cloud.");
+  } catch (e) {
+    toast("Couldn't save — is D1 bound to this Pages project?", true);
+  }
+}
+
+function loadScenario() {
+  const sel = $("scenarioSelect");
+  const opt = sel.options[sel.selectedIndex];
+  if (!opt || !opt.dataset.state) { toast("Pick a saved scenario first.", true); return; }
+  try { applyState(JSON.parse(opt.dataset.state)); toast("Loaded “" + opt.textContent + "”."); }
+  catch (e) { toast("That scenario is corrupted.", true); }
+}
+
+async function deleteScenario() {
+  const sel = $("scenarioSelect");
+  const id = sel.value;
+  if (!id) { toast("Pick a saved scenario first.", true); return; }
+  try {
+    const res = await fetch(API + "/" + id, { method: "DELETE" });
+    if (!res.ok) throw new Error("del " + res.status);
+    await refreshScenarios();
+    toast("Deleted.");
+  } catch (e) { toast("Couldn't delete.", true); }
+}
+
+/* ---------- wire up ---------- */
+FIELDS.forEach((f) => $(f).addEventListener("input", render));
+$("saveBtn").addEventListener("click", saveScenario);
+$("loadBtn").addEventListener("click", loadScenario);
+$("deleteBtn").addEventListener("click", deleteScenario);
+
+render();
+refreshScenarios();
+</script>
+</body>
+</html>

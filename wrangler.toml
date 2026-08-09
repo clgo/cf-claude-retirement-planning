@@ -1,0 +1,14 @@
+name = "sg-retirement-calculator"
+compatibility_date = "2024-09-23"
+
+# Cloudflare Pages serves everything in ./public as static assets,
+# and everything in ./functions as Pages Functions (the /api/* endpoints).
+pages_build_output_dir = "public"
+
+# --- D1 binding -------------------------------------------------------------
+# After running `wrangler d1 create retirement_calculator`, paste the printed
+# database_id below. Cloudflare Pages reads this file to bind D1 as `env.DB`.
+[[d1_databases]]
+binding = "DB"
+database_name = "retirement_calculator"
+database_id = "PASTE_YOUR_DATABASE_ID_HERE"
