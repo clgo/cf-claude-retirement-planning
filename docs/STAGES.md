@@ -51,11 +51,13 @@ a single shared bucket, so deploying first would have exposed an open read/write
 - [x] `DELETE` now 404s instead of reporting success for rows that were never there
 - [x] Sign-in/out UI and the plain-language privacy note
 - [x] Verified locally against a minted session (see table below)
+- [x] Merged to `main` (fast-forward) so Pages deploys the authenticated version
 - [ ] **Manual:** create the Google OAuth client and fill in `.dev.vars` (README §3)
 - [ ] End-to-end sign-in with a real Google account — cannot be tested without the above
-- **Last commit:** `pending`
-- **Branch:** `phase-2-google-auth`
-- **Next task:** follow README §3 to create the OAuth client, then sign in for real
+- **Last commit:** `0b0a754` — Google sign-in, per-user scoping, privacy note
+- **Branch:** `phase-2-google-auth`, merged into `main`
+- **Next task:** Phase 3. The OAuth client is created *after* the domain is live, so that
+  the redirect URI can be registered as `https://retirement.aipropfolio.com/api/auth/callback`.
 
 ### Local verification (Phase 2, run 2026-08-09, dummy credentials + minted cookie)
 | Check | Result |
@@ -79,6 +81,10 @@ a single shared bucket, so deploying first would have exposed an open read/write
 | calculator signed out | renders, 34 element ids resolve, JS parses |
 
 ## Phase 3 – D1 wiring ❌
+Do this *before* the first Pages deploy: `wrangler.toml` still holds the literal
+`PASTE_YOUR_DATABASE_ID_HERE`, and rather than discover how Pages reacts to that on a live
+domain, replace it with a real id first.
+
 - [ ] `npx wrangler login` and `npx wrangler d1 create retirement_calculator` *(manual)*
 - [ ] Paste the printed `database_id` into `wrangler.toml`
 - [ ] `npm run db:init:remote` to create the table
