@@ -80,22 +80,21 @@ a single shared bucket, so deploying first would have exposed an open read/write
 | `/api/_shared.js` | not routed; no source exposed |
 | calculator signed out | renders, 34 element ids resolve, JS parses |
 
-## Phase 3 – D1 wiring ❌
-Do this *before* the first Pages deploy: `wrangler.toml` still holds the literal
-`PASTE_YOUR_DATABASE_ID_HERE`, and rather than discover how Pages reacts to that on a live
-domain, replace it with a real id first.
+## Phase 3 – D1 wiring ✅
+Done before the first Pages deploy, so the placeholder `database_id` never reached a live
+deployment.
 
-- [ ] `npx wrangler login` and `npx wrangler d1 create retirement_calculator` *(manual)*
-- [ ] Paste the printed `database_id` into `wrangler.toml`
-- [ ] `npm run db:init:remote` to create the table
-- [x] `npm run db:init` for the local dev database
+- [x] `npx wrangler login` — needed an unsandboxed shell; the first attempt timed out at
+      120 s because the sandbox could not open a browser or bind the callback port
+- [x] `npx wrangler d1 create retirement_calculator` — created in **APAC**
+- [x] `database_id = e4f2eb61-01f8-4b1d-b3e2-63e58548bf59` in `wrangler.toml`
+- [x] `npm run db:init:remote`; verified remotely that `scenarios` and
+      `idx_scenarios_user` exist and `user_sub` is `NOT NULL`
+- [x] `npm run db:init` re-run locally, since the real id re-keys the local database
 - [x] Verify save → list → load → delete round-trips locally
-- **Last commit:** `pending`
-- **Branch:** `phase-3-d1-wiring`
-- **Next task:** create the remote database and fill in `database_id`. Note that
-  `db:init` currently writes to a local database keyed on the literal placeholder
-  `PASTE_YOUR_DATABASE_ID_HERE`; once a real `database_id` is pasted in, the local
-  database is re-keyed and the table must be created again with `npm run db:init`.
+- **Last commit:** `0a364db` — set the real D1 database_id
+- **Branch:** `main`
+- **Next task:** Phase 3 complete.
 
 ## Phase 4 – Deploy ❌
 - [x] Push to GitHub
@@ -104,11 +103,20 @@ domain, replace it with a real id first.
 - [x] Confirm the `DB` binding is picked up from `wrangler.toml` on deploy — proven by
       `/api/scenarios` answering 401 rather than 503, since the `!env.DB` check runs first
 - [ ] Add `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `SESSION_SECRET` as Pages **secrets**
-- [ ] Add the `https://<project>.pages.dev` origin and callback URL to the Google client
-- [ ] Smoke-test every route against the deployed URL
-- **Last commit:** `pending`
-- **Branch:** `phase-4-deploy`
-- **Next task:** blocked on Phase 3
+- [ ] Attach `retirement.aipropfolio.com` as a custom domain
+- [ ] Create the Google OAuth client against the final domain
+- [ ] Redeploy so the secrets reach the running app, then smoke-test every route
+- **Last commit:** `81bd286` — matched wrangler name to the Pages project
+- **Branch:** `main`
+- **Next task:** attach the custom domain, then create the OAuth client against it
+
+### Live verification (Phase 4, first deploy, before any secrets)
+| Check | Result |
+|---|---|
+| `GET /` | 200, 44 976 bytes, privacy note present |
+| `/api/auth/me` | `{signedIn:false, configured:false}` |
+| `/api/scenarios` | **401** — so `env.DB` is bound; unbound would be 503 |
+| `/api/auth/login` | 503 — no OAuth client yet |
 
 ## Phase 5 – Hardening ❌
 - [ ] Verify the financial model against a reference spreadsheet (see `model-verifier`
