@@ -1,4 +1,4 @@
-name = "sg-retirement-calculator"
+name = "cf-claude-retirement-planning"
 compatibility_date = "2024-09-23"
 
 # Cloudflare Pages serves everything in ./public as static assets,

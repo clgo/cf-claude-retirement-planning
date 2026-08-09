@@ -98,9 +98,11 @@ domain, replace it with a real id first.
   database is re-keyed and the table must be created again with `npm run db:init`.
 
 ## Phase 4 – Deploy ❌
-- [ ] Push to GitHub
-- [ ] Connect the repo in Cloudflare Pages (preset None, empty build command, output `public`)
-- [ ] Confirm the `DB` binding is picked up from `wrangler.toml` on deploy
+- [x] Push to GitHub
+- [x] Connect the repo in Cloudflare Pages (preset None, empty build command, output `public`)
+      — project name is `cf-claude-retirement-planning`, Git-connected to `main`
+- [x] Confirm the `DB` binding is picked up from `wrangler.toml` on deploy — proven by
+      `/api/scenarios` answering 401 rather than 503, since the `!env.DB` check runs first
 - [ ] Add `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `SESSION_SECRET` as Pages **secrets**
 - [ ] Add the `https://<project>.pages.dev` origin and callback URL to the Google client
 - [ ] Smoke-test every route against the deployed URL
